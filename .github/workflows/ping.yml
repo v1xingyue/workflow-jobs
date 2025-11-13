@@ -3,11 +3,23 @@ name: Ping
 on:
     workflow_dispatch:
     schedule:
-        - cron: "0/30 * * * *"
+        - cron: "0/10 * * * *"
 
 jobs:
     ping:
         runs-on: ubuntu-latest
+        env:
+            MY_SECRET_KEY: ${{ secrets.MY_SECRET_KEY }}
         steps:
-            - name: Ping
-              run: echo "Hello, world!"
+            - uses: actions/checkout@v4
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+            - name: Install dependencies
+              run: npm instal
+            - name: Run Build
+              run: npm run build
+
+            - name: Execute CLI
+              run: node dist/cli.js
