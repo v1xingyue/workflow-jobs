@@ -1,34 +1,37 @@
 name: Build Frontend
 
 on:
-    workflow_dispatch:
-    push:
-        tags:
-            - "page-*"
+  workflow_dispatch:
+  push:
+    tags:
+      - "page-*"
 
 permissions:
-    contents: write
-    pages: write
+  contents: write
+  pages: write
 
 jobs:
-    ping:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20
-            - name: Use pnpm
-              uses: pnpm/action-setup@v4
-              with:
-                  version: 9.15.0
-            - name: Install dependencies
-              run: pnpm install
-            - name: Run Build
-              run: pnpm run build:frontend
-            - name: Deploy
-              uses: peaceiris/actions-gh-pages@v3
-              with:
-                  github_token: ${{ secrets.GITHUB_TOKEN }}
-                  publish_dir: ./dist-frontend
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Use pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - name: Install dependencies
+        run: pnpm install
+      - name: Run Build
+        run: pnpm run build:frontend
+
+      - name: add cname to pages
+        run: echo "jobs.xingyue.tech" > ./dist-frontend/CNAME
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist-frontend
