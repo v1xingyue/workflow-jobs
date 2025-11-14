@@ -13,10 +13,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const commander_1 = require("commander");
 const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
+const commands_1 = require("./commands");
+const program = new commander_1.Command();
+program.version("1.0.0");
+// 注册所有命令
+(0, commands_1.registerCommands)(program);
 const cliMain = () => __awaiter(void 0, void 0, void 0, function* () {
-    const value = process.env.MY_SECRET_KEY;
-    console.log("Hello World from CLI", value);
+    dotenv_1.default.config();
+    program.parse(process.argv);
 });
 cliMain();

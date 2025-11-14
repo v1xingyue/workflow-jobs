@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 
+import { Command } from "commander";
 import dotenv from "dotenv";
-dotenv.config();
+import { registerCommands } from "./commands";
+
+const program = new Command();
+program.version("1.0.0");
+
+// 注册所有命令
+registerCommands(program);
 
 const cliMain = async () => {
-  const value = process.env.MY_SECRET_KEY;
-  console.log("Hello World from CLI", value);
+  dotenv.config();
+  program.parse(process.argv);
 };
 cliMain();
