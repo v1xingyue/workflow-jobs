@@ -13,25 +13,61 @@ on:
             directory:
                 description: "Directory path to clone into"
                 required: true
-                default: "/"
+                default: "solana-contract"
+            network:
+                description: "Solana network (devnet/testnet/mainnet)"
+                required: true
+                default: "devnet"
+                type: choice
+                options:
+                    - devnet
+                    - testnet
+                    - mainnet-beta
+            program_name:
+                description: "Program name (for finding .so file)"
+                required: false
 
 jobs:
-    clone-code:
+    deploy:
         runs-on: ubuntu-latest
         steps:
             - name: Install basic tools
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y curl git
+                  sudo apt-get install -y curl git build-essential pkg-config libssl-dev
 
-            - name: Setup Solana CLI Environment
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rustfmt, clippy
+
+            - name: Setup Solana CLI
               run: |
-                  curl -sSLf https://release.solana.com/v1.18.0/install | sh
-                  export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
+                  sh -c "$(curl -sSfL https://release.solana.com/v1.18.0/install)"
+                  echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+            - name: Verify Solana CLI
+              run: |
                   solana --version
-                  solana-keygen new --outfile ~/.config/solana/id.json
+                  solana config set --url ${{ inputs.network }}
+
+            - name: Setup Solana Keypair
+              run: |
+                  mkdir -p ~/.config/solana
+                  if [ -n "${{ secrets.SOLANA_PRIVATE_KEY }}" ] && [ "${{ secrets.SOLANA_PRIVATE_KEY }}" != "" ]; then
+                      echo "${{ secrets.SOLANA_PRIVATE_KEY }}" > ~/.config/solana/id.json
+                      echo "Using keypair from secrets"
+                  else
+                      echo "Warning: SOLANA_PRIVATE_KEY secret not set, generating new keypair"
+                      solana-keygen new --no-bip39-passphrase --outfile ~/.config/solana/id.json
+                  fi
                   solana address
-                  solana airdrop 1
+
+            - name: Request Airdrop (devnet/testnet only)
+              if: inputs.network != 'mainnet-beta'
+              run: |
+                  solana airdrop 2 || echo "Airdrop failed or not needed"
+                  solana balance
 
             - name: Clone Code
               uses: actions/checkout@v4
@@ -40,9 +76,62 @@ jobs:
                   path: ${{ inputs.directory }}
                   ref: ${{ inputs.ref || 'main' }}
 
-            - name: Compile Program
+            - name: Build Solana Program
+              working-directory: ${{ inputs.directory }}
               run: |
-                  cargo build-bpf
-                  so_path=$(find target/deploy -name "*.so")
-                  echo "Program built at: $so_path"
-                  solana program deploy $so_path
+                  # Find Cargo.toml in program directory
+                  BUILD_DIR="."
+                  if [ -f "programs/Cargo.toml" ]; then
+                      BUILD_DIR="programs"
+                  elif [ -f "Cargo.toml" ]; then
+                      BUILD_DIR="."
+                  else
+                      echo "Error: Could not find Cargo.toml"
+                      exit 1
+                  fi
+
+                  echo "Building in directory: $BUILD_DIR"
+
+                  # Build the program
+                  cargo build-bpf --manifest-path "$BUILD_DIR/Cargo.toml"
+
+                  # Find the .so file (target/deploy is relative to workspace root)
+                  DEPLOY_DIR="target/deploy"
+                  if [ -n "${{ inputs.program_name }}" ]; then
+                      SO_FILE=$(find "$DEPLOY_DIR" -name "${{ inputs.program_name }}.so" 2>/dev/null | head -1)
+                  else
+                      SO_FILE=$(find "$DEPLOY_DIR" -name "*.so" 2>/dev/null | head -1)
+                  fi
+
+                  if [ -z "$SO_FILE" ]; then
+                      echo "Error: Could not find .so file in $DEPLOY_DIR"
+                      echo "Available files:"
+                      find . -name "*.so" 2>/dev/null || echo "No .so files found"
+                      exit 1
+                  fi
+
+                  # Convert to absolute path
+                  SO_FILE=$(realpath "$SO_FILE")
+                  echo "Program built at: $SO_FILE"
+                  echo "SO_FILE=$SO_FILE" >> $GITHUB_ENV
+
+            - name: Deploy Program
+              working-directory: ${{ inputs.directory }}
+              run: |
+                  if [ -z "$SO_FILE" ]; then
+                      echo "Error: SO_FILE not set"
+                      exit 1
+                  fi
+
+                  echo "Deploying program: $SO_FILE"
+                  solana program deploy $SO_FILE --program-id ~/.config/solana/id.json || \
+                  solana program deploy $SO_FILE
+
+                  echo "Deployment completed successfully!"
+
+            - name: Get Program ID
+              run: |
+                  PROGRAM_ID=$(solana address)
+                  echo "Program ID: $PROGRAM_ID"
+                  echo "Network: ${{ inputs.network }}"
+                  echo "Program deployed successfully!"
