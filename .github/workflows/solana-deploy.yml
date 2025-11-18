@@ -1,0 +1,43 @@
+name: Deploy Solana Smart Contract
+
+on:
+    workflow_dispatch:
+        inputs:
+            github_repo:
+                description: "GitHub repository URL"
+                required: true
+                default: "https://github.com/solana-labs/solana.git"
+            ref:
+                description: "Tag or branch to checkout"
+                required: false
+            directory:
+                description: "Directory path to clone into"
+                required: true
+                default: "/"
+
+jobs:
+    clone-code:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Setup Solana CLI Environment
+              run: |
+                  curl -sSLf https://release.solana.com/v1.18.0/install | sh
+                  export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
+                  solana --version
+                  solana-keygen new --outfile ~/.config/solana/id.json
+                  solana address
+                  solana airdrop 1
+
+            - name: Clone Code
+              uses: actions/checkout@v4
+              with:
+                  repository: ${{ inputs.github_repo }}
+                  path: ${{ inputs.directory }}
+                  ref: ${{ inputs.ref || 'main' }}
+
+            - name: Compile Program
+              run: |
+                  cargo build-bpf
+                  so_path=$(find target/deploy -name "*.so")
+                  echo "Program built at: $so_path"
+                  solana program deploy $so_path
