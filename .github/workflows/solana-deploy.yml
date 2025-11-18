@@ -34,7 +34,7 @@ jobs:
             - name: Install basic tools
               run: |
                   sudo apt-get update
-                  sudo apt-get install -y curl git build-essential pkg-config libssl-dev
+                  sudo apt-get install -y curl wget git build-essential pkg-config libssl-dev ca-certificates
 
             - name: Install Rust
               uses: dtolnay/rust-toolchain@stable
@@ -42,17 +42,96 @@ jobs:
                   components: rustfmt, clippy
 
             - name: Setup Solana CLI
+              env:
+                  SOLANA_VERSION: v1.18.0
               run: |
-                  sh -c "$(curl -sSfL https://release.solana.com/v1.18.0/install)"
-                  echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+                  # Method 1: Try using the official installer with retry
+                  echo "Attempting to install Solana CLI..."
+                  
+                  MAX_RETRIES=3
+                  RETRY_COUNT=0
+                  INSTALL_SUCCESS=false
+                  
+                  while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                      if sh -c "$(curl -sSfL https://release.solana.com/$SOLANA_VERSION/install)" 2>&1; then
+                          if [ -f "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
+                              echo "Solana CLI installed successfully via installer"
+                              INSTALL_SUCCESS=true
+                              break
+                          fi
+                      fi
+                      RETRY_COUNT=$((RETRY_COUNT + 1))
+                      echo "Install attempt $RETRY_COUNT failed, retrying..."
+                      sleep 2
+                  done
+                  
+                  # If installer failed, try alternative method - download from GitHub releases
+                  if [ "$INSTALL_SUCCESS" != "true" ]; then
+                      echo "Installer failed, trying alternative download method from GitHub..."
+                      
+                      SOLANA_INSTALL_DIR="$HOME/.local/share/solana/install"
+                      mkdir -p "$SOLANA_INSTALL_DIR/$SOLANA_VERSION"
+                      
+                      # Download and extract binary directly from GitHub
+                      cd /tmp
+                      DOWNLOAD_SUCCESS=false
+                      
+                      # Try wget first
+                      if command -v wget &> /dev/null; then
+                          if wget --retry-connrefused --waitretry=3 --read-timeout=20 --timeout=15 -t 3 \
+                              "https://github.com/solana-labs/solana/releases/download/$SOLANA_VERSION/solana-release-x86_64-unknown-linux-gnu.tar.bz2" -O solana.tar.bz2 2>&1; then
+                              DOWNLOAD_SUCCESS=true
+                          fi
+                      fi
+                      
+                      # If wget failed, try curl
+                      if [ "$DOWNLOAD_SUCCESS" != "true" ] && command -v curl &> /dev/null; then
+                          if curl -L --retry 3 --retry-delay 2 --connect-timeout 20 --max-time 60 \
+                              "https://github.com/solana-labs/solana/releases/download/$SOLANA_VERSION/solana-release-x86_64-unknown-linux-gnu.tar.bz2" \
+                              -o solana.tar.bz2 2>&1; then
+                              DOWNLOAD_SUCCESS=true
+                          fi
+                      fi
+                      
+                      if [ "$DOWNLOAD_SUCCESS" = "true" ] && [ -f solana.tar.bz2 ]; then
+                          echo "Extracting Solana CLI..."
+                          tar jxf solana.tar.bz2 -C "$SOLANA_INSTALL_DIR/$SOLANA_VERSION" --strip-components 1
+                          ln -sfn "$SOLANA_INSTALL_DIR/$SOLANA_VERSION" "$SOLANA_INSTALL_DIR/active_release"
+                          INSTALL_SUCCESS=true
+                      fi
+                  fi
+                  
+                  # Verify installation
+                  SOLANA_BIN="$HOME/.local/share/solana/install/active_release/bin"
+                  if [ ! -f "$SOLANA_BIN/solana" ]; then
+                      echo "Error: Solana CLI installation failed after all attempts"
+                      echo "Checking installation directory:"
+                      ls -la "$HOME/.local/share/solana/install/" || true
+                      exit 1
+                  fi
+                  
+                  # Add to PATH for current and future steps
+                  echo "$SOLANA_BIN" >> $GITHUB_PATH
+                  export PATH="$SOLANA_BIN:$PATH"
+                  
+                  # Verify it works
+                  if ! "$SOLANA_BIN/solana" --version; then
+                      echo "Error: Solana CLI binary exists but failed to execute"
+                      exit 1
+                  fi
+                  
+                  echo "Solana CLI installed and verified:"
+                  "$SOLANA_BIN/solana" --version
 
             - name: Verify Solana CLI
               run: |
+                  export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
                   solana --version
                   solana config set --url ${{ inputs.network }}
 
             - name: Setup Solana Keypair
               run: |
+                  export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
                   mkdir -p ~/.config/solana
                   if [ -n "${{ secrets.SOLANA_PRIVATE_KEY }}" ] && [ "${{ secrets.SOLANA_PRIVATE_KEY }}" != "" ]; then
                       echo "${{ secrets.SOLANA_PRIVATE_KEY }}" > ~/.config/solana/id.json
@@ -66,6 +145,7 @@ jobs:
             - name: Request Airdrop (devnet/testnet only)
               if: inputs.network != 'mainnet-beta'
               run: |
+                  export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
                   solana airdrop 2 || echo "Airdrop failed or not needed"
                   solana balance
 
@@ -118,19 +198,21 @@ jobs:
             - name: Deploy Program
               working-directory: ${{ inputs.directory }}
               run: |
+                  export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
                   if [ -z "$SO_FILE" ]; then
                       echo "Error: SO_FILE not set"
                       exit 1
                   fi
-
+                  
                   echo "Deploying program: $SO_FILE"
                   solana program deploy $SO_FILE --program-id ~/.config/solana/id.json || \
                   solana program deploy $SO_FILE
-
+                  
                   echo "Deployment completed successfully!"
 
             - name: Get Program ID
               run: |
+                  export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
                   PROGRAM_ID=$(solana address)
                   echo "Program ID: $PROGRAM_ID"
                   echo "Network: ${{ inputs.network }}"
