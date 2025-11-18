@@ -1,40 +1,128 @@
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Ensure DaisyUI components are included */
+@layer components {
+  /* This ensures DaisyUI styles are generated */
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Override wallet adapter modal styles to match DaisyUI theme */
+.wallet-adapter-modal-wrapper {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(4px);
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+.wallet-adapter-modal {
+  background-color: hsl(var(--b1)) !important;
+  border-radius: var(--rounded-box, 1rem) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid hsl(var(--b3)) !important;
+  max-width: 400px !important;
+  padding: 0 !important;
 }
 
-#root {
-  width: 100%;
+.wallet-adapter-modal-title {
+  color: hsl(var(--bc)) !important;
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 1rem !important;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
+.wallet-adapter-modal-list {
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
+.wallet-adapter-modal-list-item {
+  background-color: hsl(var(--b2)) !important;
+  border: 1px solid hsl(var(--b3)) !important;
+  border-radius: var(--rounded-btn, 0.5rem) !important;
+  margin-bottom: 0.5rem !important;
+  transition: all 0.2s !important;
+}
+
+.wallet-adapter-modal-list-item:hover {
+  background-color: hsl(var(--b3)) !important;
+  border-color: hsl(var(--p)) !important;
+}
+
+.wallet-adapter-modal-list-item button {
+  background-color: transparent !important;
+  color: hsl(var(--bc)) !important;
+  padding: 1rem !important;
+  width: 100% !important;
+  text-align: left !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+}
+
+.wallet-adapter-modal-list-item button:hover {
+  background-color: transparent !important;
+}
+
+.wallet-adapter-modal-list-item .wallet-adapter-button-start-icon {
+  width: 28px !important;
+  height: 28px !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background-color: hsl(var(--b2)) !important;
+  color: hsl(var(--bc)) !important;
+  border: 1px solid hsl(var(--b3)) !important;
+  border-radius: 50% !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+}
+
+.wallet-adapter-modal-button-close:hover {
+  background-color: hsl(var(--b3)) !important;
+  border-color: hsl(var(--er)) !important;
+  color: hsl(var(--er)) !important;
+}
+
+.wallet-adapter-modal-button-close svg {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+.wallet-adapter-modal-middle-button {
+  background-color: transparent !important;
+  color: hsl(var(--bc)) !important;
+  border: none !important;
+  padding: 0.5rem !important;
+  cursor: pointer !important;
+  text-decoration: underline !important;
+  font-size: 0.875rem !important;
+}
+
+.wallet-adapter-modal-middle-button:hover {
+  color: hsl(var(--p)) !important;
+}
+
+.wallet-adapter-button {
+  background-color: hsl(var(--p)) !important;
+  color: hsl(var(--pc)) !important;
+  border-radius: var(--rounded-btn, 0.5rem) !important;
+  border: none !important;
+  padding: 0.75rem 1.5rem !important;
+  font-weight: 600 !important;
+  transition: all 0.2s !important;
+}
+
+.wallet-adapter-button:hover:not(:disabled) {
+  background-color: hsl(var(--pf)) !important;
+}
+
+.wallet-adapter-button:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
